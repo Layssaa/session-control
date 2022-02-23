@@ -1,52 +1,55 @@
 const { connect_DB } = require("../database/connect");
-const { getDataRedis } = require("../repositories/get-redis");
-const { setDataRedis } = require("../repositories/set-redis");
+const { getDataRedis, setDataRedis } = require("../database/redis");
 const { CreateToken } = require("../utils/make-jwt");
 
 async function login(req, res) {
   const { email, password } = req.body;
-  const { token: _token } = req.cookies;
+  const { _token } = req.cookies;
   let userData;
 
   console.log(_token);
+  console.log("_______________");
 
   try {
-    userData = await getDataRedis(`session-${_token}`); //o token sempre muda
+    userData = await getDataRedis(`session-${_token}`); //mudar a KEY, deixar só o token
     console.log(userData);
 
-    if (!userData || userData.attempts != 0) {
+    if (!userData || userData.attempts != 0 || !_token) {
       const { rows } = await connect_DB(
-        " SELECT * FROM  users WHERE email = $1",
+        "SELECT * FROM  users WHERE email = $1",
         [email]
       );
 
       userData = rows;
+      const { token } = await CreateToken(email);
 
       if (userData.length == 0) throw new Error("User not found");
 
       if (userData[0].password != password) {
-        console.log("senha errada");
+        console.log("token", token);
+
         setDataRedis(
-          `session-${_token}`,
+          `session-${token}`,
           {
             id: userData.id,
             attempts: userData.attempts + 1,
             delete: false,
           },
           "EX",
-          120 * userData.attempts + 10
+          0
         );
 
-        res.cookie("_token", _token, {
+        res.cookie("_token", _token || token, {
           secure: true,
           httpOnly: true,
           sameSite: "none",
         });
 
-        throw new Error("Incorrect data");
+        return res.send({ data: "Incorrect data", status: 401 }).status(200);
+
+        // throw new Error("Incorrect data");
       }
 
-      const { token } = await CreateToken(email); 
       console.log("será enviado");
       console.log(`session-${token}`);
 
@@ -71,10 +74,23 @@ async function login(req, res) {
     res.json({ data: userData }).status(200);
   } catch (error) {
     console.log(error);
-    res
-      .status(200)
-      .send({ status: 500, msg: "Could not connect to the database." });
+    res.status(200).send({ status: 500, msg: error });
   }
 }
 
 module.exports = { login };
+
+/*if (_token != undefined) {
+          console.log('_token', _token);
+          setDataRedis(
+            `session-${_token}`,
+            {
+              id: userData.id,
+              attempts: userData.attempts + 1,
+              delete: false,
+            },
+            "EX",
+            120 * Number(userData.attempts) + 10
+          );
+        } else {*/
+//}

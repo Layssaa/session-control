@@ -3,7 +3,7 @@ const { getDataRedis } = require("../repositories/get-redis");
 async function authCookie(req, res, next) {
   const { token: _token } = req.cookies;
   const userLogged = await getDataRedis(`user-${_token}`);
-//o token sempre muda
+  
   if (!userLogged) return next();
 
   if (userLogged.attempts > 5) {

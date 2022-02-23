@@ -3,6 +3,13 @@ const express = require("express");
 const app = express();
 const router = require("./routers/routers");
 const cookieParser = require('cookie-parser');
+const cors = require('cors');
+
+app.use(cors({
+    "origin": process.env.REACT_APP_BASE_URL,
+    "methods": "GET,POST, PUT, DELETE",
+    "credentials": true
+}));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
