@@ -10,10 +10,12 @@ async function getDataRedis(_search) {
   return JSON.parse(await redisClient.get(_search));
 }
 
-async function setDataRedis(_key, _send, ..._options) {
-  return await redisClient.set(_key, JSON.stringify(_send), ..._options);
+async function setDataRedis(_key, _send, timestamp) {
+  const time = timestamp ** 2 * 1000;
+  console.log(_send);
+  return await redisClient.set(_key, JSON.stringify(_send), "EX", timestamp ** 2 * 1000);
 }
 
-module.exports = { redisClient, getDataRedis, setDataRedis };
+module.exports = { getDataRedis, setDataRedis };
 
 // melhorar conexão com redis

@@ -6,13 +6,19 @@ async function login(req, res) {
   const { email, password } = req.body;
   const { _token } = req.cookies;
   let userData;
-
-  console.log(_token);
-  console.log("_______________");
+  let feedbackMessage = "";
 
   try {
-    userData = await getDataRedis(`session-${_token}`); //mudar a KEY, deixar só o token
-    console.log(userData);
+    userData = await getDataRedis(`session-${_token}`);
+
+    // console.log("------- Data ------");
+    // console.log(userData);
+
+    // userData: {
+    //    id,
+    //    attempts,
+    //    delete
+    // }
 
     if (!userData || userData.attempts != 0 || !_token) {
       const { rows } = await connect_DB(
@@ -21,48 +27,21 @@ async function login(req, res) {
       );
 
       userData = rows;
-      const { token } = await CreateToken(email);
 
       if (userData.length == 0) throw new Error("User not found");
 
-      if (userData[0].password != password) {
-        console.log("token", token);
-
-        setDataRedis(
-          `session-${token}`,
-          {
-            id: userData.id,
-            attempts: userData.attempts + 1,
-            delete: false,
-          },
-          "EX",
-          0
-        );
-
-        res.cookie("_token", _token || token, {
-          secure: true,
-          httpOnly: true,
-          sameSite: "none",
-        });
-
-        return res.send({ data: "Incorrect data", status: 401 }).status(200);
-
-        // throw new Error("Incorrect data");
-      }
-
-      console.log("será enviado");
-      console.log(`session-${token}`);
-
-      setDataRedis(
-        `session-${token}`,
-        {
-          id: userData.id,
-          attempts: 0,
-          delete: false,
-        },
-        "EX",
-        3600
+      const { token, message } = await matchPasswordControllSession(
+        userData,
+        email,
+        password,
+        _token
       );
+
+      feedbackMessage = message;
+
+      console.log(feedbackMessage);
+      console.log("--------------token---------------");
+      console.log(token);
 
       res.cookie("_token", token, {
         secure: true,
@@ -71,7 +50,7 @@ async function login(req, res) {
       });
     }
 
-    res.json({ data: userData }).status(200);
+    res.json({ data: userData, message: feedbackMessage }).status(200);
   } catch (error) {
     console.log(error);
     res.status(200).send({ status: 500, msg: error });
@@ -80,17 +59,79 @@ async function login(req, res) {
 
 module.exports = { login };
 
-/*if (_token != undefined) {
-          console.log('_token', _token);
-          setDataRedis(
-            `session-${_token}`,
-            {
-              id: userData.id,
-              attempts: userData.attempts + 1,
-              delete: false,
-            },
-            "EX",
-            120 * Number(userData.attempts) + 10
-          );
-        } else {*/
-//}
+async function matchPasswordControllSession(userData, email, password, _token) {
+  console.log(userData);
+  if (userData[0].password != password && !_token) {
+    const { token } = await CreateToken(email);
+
+    setDataRedis(
+      `session-${token}`,
+      {
+        id: userData[0].id,
+        attempts: 1,
+        delete: false,
+      },
+      1
+    );
+
+    return { token, message: "Incorret password and dont have loggin before" };
+  }
+
+  if (userData[0].password != password && _token) {
+    setDataRedis(
+      `session-${_token}`,
+      {
+        id: userData[0].id,
+        attempts: userData.attempts + 1,
+        delete: false,
+      },
+      userData.attempts + 1
+    );
+
+    return {
+      token: _token,
+      message: "Incorret password and try do loggin before",
+    };
+  }
+
+  const { token } = await CreateToken(email);
+
+  setDataRedis(
+    `session-${token}`,
+    {
+      id: userData.id,
+      attempts: 0,
+      delete: false,
+    },
+    3600
+  );
+
+  return { token, message: "OK" };
+}
+
+// console.log("token -->", _token);
+//  console.log("attempts -->", userData);
+//
+//  const attempts = userData[0].attempts || 0;
+//  console.log("Verificar ATTEMPTS", attempts);
+//
+//  setDataRedis(
+//  `session-${_token || token}`,
+//  {
+//  id: userData[0].id,
+//  attempts: attempts + 1,
+//  delete: false,
+//  },
+//  attempts + 1
+//  );
+//
+//  res.cookie("_token", _token || token, {
+//  secure: true,
+//  httpOnly: true,
+//  sameSite: "none",
+//  });
+//
+//  return res.send({ data: "Incorrect data", status: 401 }).status(200);
+//
+// throw new Error("Incorrect data");
+//  return;

@@ -1,4 +1,4 @@
-const { getDataRedis } = require("../repositories/get-redis");
+const { getDataRedis } = require("../database/redis");
 
 async function authCookie(req, res, next) {
   const { token: _token } = req.cookies;
@@ -10,7 +10,7 @@ async function authCookie(req, res, next) {
     res.status(200).send({
       status: 400,
       msg: `You have exceeded the maximum request, wait ${
-        userLogged.attempts * 2
+        userLogged.attempts ** 2 * 1000
       } minutes`,
     });
   }
